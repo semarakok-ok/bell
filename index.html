@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bell Sekolah Digital</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gradient-to-br from-blue-300 via-blue-500 to-sky-650 min-h-screen">
+
+<div class="max-w-6xl mx-auto px-4 py-6">
+
+<!-- HEADER + SLIDER -->
+<div id="sliderHeader"
+ class="relative rounded-xl overflow-hidden shadow mb-6">
+
+  <!-- SLIDER IMAGE -->
+  <div id="sliderImage"
+   class="absolute inset-0 bg-cover bg-center transition-all duration-1000"></div>
+
+  <!-- OVERLAY -->
+  <div class="relative bg-black/50 p-6 text-center text-white">
+    <div style="display: flex; justify-content: center;"><img src="SEM.png" /> </div>
+    <h1 style="font-family: Clarendon Blk BT, sans-serif;"class="text-3xl font-bold text-gray-800 mb-2">SMPN 5 RANCAEKEK</h1>
+    <div id="clock" class="mt-1 font-semibold"></div>
+    <div id="countdown" class="text-red-300 font-semibold"></div>
+
+    <button id="statusToggle"
+      class="mt-4 px-8 py-2 rounded-full bg-gray-400 text-white font-semibold">
+      Bell: NON AKTIF
+    </button>
+
+    <!-- LIST JADWAL -->
+    <div class="grid md:grid-cols-2 gap-4 mt-6 text-left">
+      <div class="bg-white/60 text-gray-800 rounded-lg p-4">
+         <div style="display: flex; justify-content: center;">
+          <h3 style="font-family: Rockwell Extra Bold, sans-serif;"class="font-bold text-blue-700 mb-2">JADWAL PAGI</h3>
+         </div>
+        <ul id="schedulePagi" class="space-y-2 text-sm"></ul>
+      </div>
+      <div class="bg-white/60 text-gray-800 rounded-lg p-4">
+          <div style="display: flex; justify-content: center;">
+          <h3 style="font-family: Rockwell Extra Bold, sans-serif;"class="font-bold text-blue-600 mb-2">JADWAL SIANG</h3>
+          </div>
+        <ul id="scheduleSiang" class="space-y-2 text-sm"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FORM -->
+<div class="grid md:grid-cols-2 gap-6">
+
+<!-- SUARA -->
+<div class="bg-white/70 rounded-xl p-6 shadow">
+<h2 style="display: flex; justify-content: center;"class="font-bold text-blue-700 mb-3">🔊 SUARA</h2>
+<input type="file" id="soundFile" accept="audio/*" class="mb-2 w-full">
+<input type="text" id="soundName" placeholder="Nama suara" class="border p-2 w-full mb-2">
+<button style="font-family: Rockwell Extra Bold, sans-serif;id="addSound" class="w-full bg-blue-600 text-white py-2 rounded">Simpan Suara</button>
+<ul id="soundList" class="mt-3 text-sm"></ul>
+</div>
+
+<!-- JADWAL -->
+<div class="bg-white/70 rounded-xl p-6 shadow">
+<h2 style="display: flex; justify-content: center;"class="font-bold text-blue-700 mb-3">⏰ JADWAL</h2>
+<input type="time" id="bellTime" class="border p-2 w-full mb-2">
+<input type="text" id="bellNote" placeholder="Keterangan" class="border p-2 w-full mb-2">
+<select id="soundSelect" class="border p-2 w-full mb-2"></select>
+<select id="sessionSelect" class="border p-2 w-full mb-2">
+  <option value="pagi">Pagi</option>
+  <option value="siang">Siang</option>
+</select>
+<button style="font-family: Rockwell Extra Bold, sans-serif;id="saveSchedule" class="w-full bg-green-600 text-white py-2 rounded">
+Tambah Jadwal
+</button>
+</div>
+</div>
+
+<!-- UPLOAD GAMBAR -->
+<div class="bg-white/75 rounded-xl p-6 shadow mt-6">
+<h3 class="font-bold text-blue-700 mb-3">💾 Backup & Restore </h3>
+<button onclick="backupData()" class="bg-blue-600 text-white px-4 py-2 rounded mr-2">
+⬇️ Backup Data
+</button>
+
+<input type="file" id="restoreFile" accept=".json" class="hidden" onchange="restoreData(this)">
+<button onclick="restoreFile.click()" class="bg-green-600 text-white px-4 py-2 rounded">
+♻️ Restore Data
+</button>
+<input type="file" id="imageUpload" accept="image/*" multiple class="mb-3">
+
+<ul id="imageList" class="text-sm space-y-1"></ul>
+</div>
+
+</div>
+
+
+</div>
+<audio id="bellAudio"></audio>
+
+<script>
+let bellActive=false,lastPlayed={},editIndex=null;
+let sounds=JSON.parse(localStorage.getItem("sounds")||"[]");
+let schedules=JSON.parse(localStorage.getItem("schedules"))||{pagi:[],siang:[]};
+let images=JSON.parse(localStorage.getItem("bgImages")||"[]");
+let slideIndex=0;
+
+const audio=document.getElementById("bellAudio");
+
+/* ===== SLIDER ===== */
+function renderSlider(){
+ if(images.length===0)return;
+ sliderImage.style.backgroundImage=`url(${images[slideIndex]})`;
+ slideIndex=(slideIndex+1)%images.length;
+}
+setInterval(renderSlider,5000);
+renderSlider();
+
+/* ===== UPLOAD GAMBAR ===== */
+imageUpload.onchange=()=>{
+ [...imageUpload.files].forEach(f=>{
+  const r=new FileReader();
+  r.onload=()=>{
+    images.push(r.result);
+    localStorage.setItem("bgImages",JSON.stringify(images));
+    renderImageList(); renderSlider();
+  };
+  r.readAsDataURL(f);
+ });
+};
+
+function renderImageList(){
+ imageList.innerHTML="";
+ images.forEach((img,i)=>{
+  imageList.innerHTML+=`
+   <li class="flex justify-between">
+    <span>Gambar ${i+1}</span>
+    <button class="text-red-600" onclick="hapusImage(${i})">Hapus</button>
+   </li>`;
+ });
+}
+function hapusImage(i){
+ images.splice(i,1);
+ localStorage.setItem("bgImages",JSON.stringify(images));
+ renderImageList(); renderSlider();
+}
+
+
+/* ===== SUARA ===== */
+addSound.onclick=()=>{
+ if(!soundFile.files[0]||!soundName.value)return alert("Lengkapi suara");
+ const r=new FileReader();
+ r.onload=()=>{
+  sounds.push({id:Date.now(),name:soundName.value,data:r.result});
+  localStorage.setItem("sounds",JSON.stringify(sounds));
+  soundFile.value=soundName.value="";
+  renderSounds();renderSoundSelect();
+ };
+ r.readAsDataURL(soundFile.files[0]);
+};
+
+/* ===== JADWAL ===== */
+saveSchedule.onclick=()=>{
+ if(!bellTime.value||!soundSelect.value)return;
+ const obj={time:bellTime.value,note:bellNote.value,soundId:soundSelect.value};
+ const sess=sessionSelect.value;
+
+ if(editIndex!==null){
+  schedules[sess][editIndex]=obj;
+  editIndex=null;
+  saveSchedule.textContent="Tambah Jadwal";
+ } else schedules[sess].push(obj);
+
+ localStorage.setItem("schedules",JSON.stringify(schedules));
+ bellTime.value=bellNote.value="";
+ renderSchedules();
+};
+
+function editJadwal(sess,i){
+ const s=schedules[sess][i];
+ bellTime.value=s.time;
+ bellNote.value=s.note;
+ soundSelect.value=s.soundId;
+ sessionSelect.value=sess;
+ editIndex=i;
+ saveSchedule.textContent="Update Jadwal";
+}
+
+function hapus(sess,i){
+ schedules[sess].splice(i,1);
+ localStorage.setItem("schedules",JSON.stringify(schedules));
+ renderSchedules();
+}
+/* BACKUP */
+function backupData(){
+ const data={sounds,schedules};
+ const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);
+ a.download="backup_bell_sekolah.json";
+ a.click();
+}
+
+function restoreData(input){
+ const r=new FileReader();
+ r.onload=()=>{
+  const d=JSON.parse(r.result);
+  sounds=d.sounds||[];
+  schedules=d.schedules||{pagi:[],siang:[]};
+  localStorage.setItem("sounds",JSON.stringify(sounds));
+  localStorage.setItem("schedules",JSON.stringify(schedules));
+  renderSounds();renderSoundSelect();renderSchedules();
+ };
+ r.readAsText(input.files[0]);
+}
+
+
+/* ===== RENDER ===== */
+function renderSounds(){
+ soundList.innerHTML="";
+ sounds.forEach(s=>soundList.innerHTML+=`<li>🔊 ${s.name}</li>`);
+}
+function renderSoundSelect(){
+ soundSelect.innerHTML=sounds.map(s=>`<option value="${s.id}">${s.name}</option>`).join("");
+}
+function renderSchedules(){
+ schedulePagi.innerHTML=scheduleSiang.innerHTML="";
+ ["pagi","siang"].forEach(sess=>{
+  schedules[sess].forEach((s,i)=>{
+   const snd=sounds.find(x=>x.id==s.soundId);
+   const li=document.createElement("li");
+   li.className="border rounded p-2 flex justify-between";
+   li.innerHTML=`
+    <span><b>${s.time}</b> - ${s.note}<br>🔊 ${snd?.name||""}</span>
+    <span>
+      <button onclick="editJadwal('${sess}',${i})">✏️</button>
+      <button onclick="hapus('${sess}',${i})" class="text-red-600">❌</button>
+    </span>`;
+   (sess==="pagi"?schedulePagi:scheduleSiang).appendChild(li);
+  });
+ });
+}
+
+/* ===== STATUS & JAM ===== */
+statusToggle.onclick=()=>{
+ bellActive=!bellActive;
+ statusToggle.textContent=bellActive?"Bell: AKTIF":"Bell: NON AKTIF";
+ statusToggle.className=bellActive?
+ "mt-4 px-8 py-2 rounded-full bg-green-600 text-white font-semibold":
+ "mt-4 px-8 py-2 rounded-full bg-gray-400 text-white font-semibold";
+};
+
+setInterval(()=>{
+ const now=new Date(),t=now.toTimeString().slice(0,5);
+ clock.textContent=now.toLocaleString("id-ID");
+ let next=null;
+ if(bellActive){
+  Object.entries(schedules).forEach(([sess,list])=>{
+   list.forEach((s,i)=>{
+    const [h,m]=s.time.split(":");
+    const bt=new Date();bt.setHours(h,m,0,0);
+    const d=bt-now;
+    if(d>0&&d<=300000&&(next===null||d<next))next=d;
+    const k=sess+i+t;
+    if(s.time===t&&!lastPlayed[k]){
+     const snd=sounds.find(x=>x.id==s.soundId);
+     if(snd){audio.src=snd.data;audio.play();lastPlayed[k]=1;}
+    }
+   });
+  });
+ }
+ countdown.textContent=next?`⏳ ${Math.floor(next/60000)}:${String(Math.floor(next/1000)%60).padStart(2,"0")}`:"";
+ if(lastPlayed._m!=now.getMinutes())lastPlayed={_m:now.getMinutes()};
+},1000);
+
+renderSounds();renderSoundSelect();renderSchedules();renderImageList();
+</script>
+
+<footer class="text-center text-white/80 mt-8">
+© 2025 Bell Sekolah Digital
+</footer>
+
+</body>
+</html>
